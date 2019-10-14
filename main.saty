@@ -1,0 +1,17 @@
+@require: stdjareport
+@import: re
+
+let-inline \show-int n  = embed-string (arabic n)
+let-inline \show-bool b = embed-string (match b with true -> `true` | false -> `false`)
+
+in
+document (|
+  title = {サンプル文書};
+  author = {組 版太郎};
+|) '<
+ +p {\show-bool(
+   let matcher = ~(let iseq = [CHAR(&`c`); KLEENE([CHAR(&`a`)]); CHAR(&`b`); MATCH] in
+                   compile iseq)
+                   in
+   matcher `caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`);}
+>
