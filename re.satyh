@@ -25,43 +25,73 @@ end = struct
       fold-right (fun _ i -> i + 1) 0 lst
 end
 
-type 'a vm-inst =
+type anchor = BOF | EOF | BOL | EOL | NOWHERE
+
+type vm-inst =
 | MATCH
-| CHAR of 'a
-| KLEENE of ('a vm-inst) list
-| OR of ('a vm-inst) list * ('a vm-inst) list
+| CHAR of string
+| ANY
+| STRING of string
+| KLEENE of vm-inst list
+| OR of vm-inst list * vm-inst list
+| ANCHOR of anchor
 
 let compile iseq =
   % pc = index of iseq
   let-rec loop iseq pc sp len s =
     match iseq with
-      | [] -> &(true)
+      | [] -> &(Some(~sp))
       | inst :: iseq ->
         (match inst with
-          | MATCH -> &(true)
+          | MATCH -> &(Some(~sp))
           | CHAR c ->
             &(let sp = ~(sp) in
-              ~(&(sp < ~len) &&&
-                &(string-same ~c (string-sub ~s sp 1)) &&&
-                (loop iseq (pc + 1) &(sp + 1) len s)
-               )
+              if ~(&(sp < ~len) &&& &(string-same ~(lift-string c) (string-sub ~s sp 1)))
+              then ~(loop iseq (pc + 1) &(sp + 1) len s)
+              else None
+             )
+          | ANY ->
+            &(let sp = ~(sp) in
+              if sp < ~len
+              then ~(loop iseq (pc + 1) &(sp + 1) len s)
+              else None
+             )
+          | STRING c ->
+            let l = string-length c in
+            &(let sp = ~(sp) in
+              if ~(&(sp < ~len) &&& &(string-same ~(lift-string c) (string-sub ~s sp ~(lift-int l))))
+              then ~(loop iseq (pc + 1) &(sp + ~(lift-int l)) len s)
+              else None
              )
           | KLEENE code ->
             &(let sp = ~(sp) in
               let-rec kleene sp =
-                let r = ~(loop code (pc + 1) &sp len s) in
-                if r
-                then kleene (sp + 1)
-                else (sp, true)
+                match ~(loop code (pc + 1) &sp len s) with
+                  | Some(sp) -> kleene sp
+                  | None -> sp
               in
-              let (sp, r) = kleene sp in
-              ~(&r &&& (loop iseq (pc + 1 + (List.length code)) &sp len s))
+              let sp = kleene sp in
+              ~(loop iseq (pc + 1 + (List.length code)) &sp len s)
               )
           | OR (code1, code2) ->
             &(let sp = ~(sp) in
-              ~((loop code1 (pc + 1                    ) &sp len s) |||
-                (loop code2 (pc + 1 + List.length code1) &sp len s)
-               )
+              match ~(loop code1 (pc + 1                    ) &sp len s) with
+                | Some(v) -> Some(v)
+                | None -> ~(loop code2 (pc + 1 + List.length code1) &sp len s)
+             )
+          | ANCHOR a ->
+            let newline = string-unexplode [10] in
+            let gen-code sp = match a with
+                  | BOF -> &(~sp == 0)
+                  | EOF -> &(~sp == string-length ~s)
+                  | BOL -> (&(~sp == 0) ||| &(string-same (string-sub ~s ~sp 1) ~(lift-string newline)))
+                  | EOL -> (&(~sp == string-length ~s) ||| &(string-same (string-sub ~s ~sp 1) ~(lift-string newline)))
+                  | NOWHERE -> &false
+            in
+            &(let sp = ~(sp) in
+              if ~(gen-code &sp)
+              then ~(loop iseq (pc + 1) &sp len s)
+              else None
              )
           )
   in

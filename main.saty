@@ -3,15 +3,21 @@
 
 let-inline \show-int n  = embed-string (arabic n)
 let-inline \show-bool b = embed-string (match b with true -> `true` | false -> `false`)
+let-inline \show-result r = embed-string (match r with Some(at) -> `matched: ` ^ (arabic at) | None -> `not matched`)
+let-inline \show-string s = embed-string s
 
 in
 document (|
   title = {サンプル文書};
   author = {組 版太郎};
 |) '<
- +p {\show-bool(
-   let matcher = ~(let iseq = [CHAR(&`c`); KLEENE([CHAR(&`a`)]); CHAR(&`b`); MATCH] in
+ +p {\show-string(
+   let matcher = ~(let iseq = [CHAR(`c`); KLEENE([CHAR(`a`)]); CHAR(`b`); ANCHOR(EOF); MATCH] in
                    compile iseq)
                    in
-   matcher `caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa`);}
+   let input = `caaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab` in
+   let result = matcher input in
+   match result with
+     | Some(at) -> `matched to `# ^ (string-sub input 0 at)
+     | None -> `not matched`);}
 >
