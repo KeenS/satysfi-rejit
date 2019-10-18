@@ -75,7 +75,7 @@ let compile iseq =
               )
           | OR (code1, code2) ->
             &(let sp = ~(sp) in
-              match ~(loop code1 (pc + 1                    ) &sp len s) with
+              match ~(loop code1 (pc + 1) &sp len s) with
                 | Some(v) -> Some(v)
                 | None -> ~(loop code2 (pc + 1 + List.length code1) &sp len s)
              )
